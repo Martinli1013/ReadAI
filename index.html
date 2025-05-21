@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拍手小游戏 (Clap Game)</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+            text-align: center;
+            flex-direction: column; /* Allow text above video */
+            cursor: pointer; /* Add cursor pointer to the whole body */
+        }
+        #videoContainer {
+            /* cursor: pointer; */ /* No longer needed here, moved to body */
+            border: 3px solid #333;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            width: 80%; /* Adjust as needed */
+            max-width: 640px; /* Adjust as needed */
+        }
+        video {
+            display: block; /* Removes extra space below video */
+            width: 100%;
+            height: auto;
+        }
+        #instructionText {
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            color: #333;
+            position: absolute; /* Position it over the video */
+            top: 20px; /* Adjust as needed */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(255, 255, 255, 0.7); /* Semi-transparent background */
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructionText">游戏加载中...</div>
+    <div id="videoContainer">
+        <video id="clapVideo" src="卓哥拍手.mp4" playsinline></video>
+    </div>
+
+    <script>
+        const video = document.getElementById('clapVideo');
+        const instructionText = document.getElementById('instructionText');
+        
+        const initialVideoSrc = "卓哥拍手.mp4"; // 3 claps
+        const singleClapVideoSrc = "卓哥拍手单次.mp4"; // 1 clap
+
+        let initialVideoPlayed = false; // Tracks if the 3-clap video has played
+
+        const readyToPlaySingleClapText = "点击鼠标左键让卓哥拍手";
+        const playingSingleClapText = "卓哥正在拍手...";
+        // const playingInitialVideoText = "视频正在首次播放 (三连拍)..."; // No longer displayed
+        const autoplayFailedText = `无法自动播放。请点击屏幕开始首次播放 (${initialVideoSrc})。`;
+        const loadErrorTextInitial = `视频 '${initialVideoSrc}' 加载错误。请检查文件名并刷新。`;
+        const loadErrorTextSingle = `视频 '${singleClapVideoSrc}' 加载错误。请检查文件名并刷新。`;
+        const genericPlayFailedText = "播放失败，请刷新页面重试。";
+
+        instructionText.textContent = "游戏加载中...";
+        console.log("Page loaded, game initializing.");
+
+        video.onerror = () => {
+            console.error("Video error occurred.");
+            if (!initialVideoPlayed) {
+                instructionText.textContent = loadErrorTextInitial;
+            } else {
+                instructionText.textContent = loadErrorTextSingle;
+            }
+            document.removeEventListener('click', handleFirstManualPlay);
+            document.removeEventListener('click', handleSingleClapPlay);
+        };
+
+        function setupForSingleClapPlays() {
+            video.src = singleClapVideoSrc;
+            video.load();
+            video.muted = false;
+            instructionText.textContent = readyToPlaySingleClapText;
+            initialVideoPlayed = true;
+            document.removeEventListener('click', handleFirstManualPlay);
+            document.addEventListener('click', handleSingleClapPlay);
+            console.log("Setup for single clap plays. Listener for handleSingleClapPlay added.");
+        }
+
+        video.onended = () => {
+            console.log("Video ended. Current src: " + video.currentSrc);
+            if (!initialVideoPlayed) {
+                console.log("Initial video ended. Setting up for single claps.");
+                setupForSingleClapPlays();
+            } else {
+                console.log("Single clap video ended. Setting text.");
+                instructionText.textContent = readyToPlaySingleClapText;
+            }
+        };
+
+        // Autoplay initial video
+        video.muted = true;
+        video.src = initialVideoSrc; // Ensure correct initial src
+        video.load();
+        video.play().then(() => {
+            instructionText.textContent = ''; // No text during initial autoplay
+            console.log("Initial video autoplay started.");
+        }).catch(error => {
+            console.error("Autoplay of initial video failed:", error);
+            if (error.name === 'NotAllowedError') {
+                 instructionText.textContent = autoplayFailedText;
+            } else {
+                 instructionText.textContent = loadErrorTextInitial;
+            }
+            document.addEventListener('click', handleFirstManualPlay, { once: true });
+            console.log("Autoplay failed, listener for handleFirstManualPlay added.");
+        });
+
+        // Listener for the very first manual play (if autoplay failed for initial video)
+        function handleFirstManualPlay() {
+            console.log("handleFirstManualPlay called.");
+            if (video.paused && video.src.includes(initialVideoSrc)) { 
+                video.muted = true; 
+                instructionText.textContent = ''; // No text during initial manual play
+                console.log("Playing initial video manually.");
+                video.play().catch(e => {
+                    console.error("First manual play of initial video failed:", e);
+                    instructionText.textContent = genericPlayFailedText;
+                });
+            } else {
+                console.log("handleFirstManualPlay: conditions not met or wrong video src.");
+            }
+        }
+        
+        // Listener for all single clap plays
+        function handleSingleClapPlay() {
+            console.log("handleSingleClapPlay called. Video paused: " + video.paused + ", initialVideoPlayed: " + initialVideoPlayed + ", video src: " + video.currentSrc);
+            if (video.paused && initialVideoPlayed && video.currentSrc && decodeURIComponent(video.currentSrc).includes(singleClapVideoSrc)) {
+                video.currentTime = 0;
+                instructionText.textContent = playingSingleClapText;
+                console.log("Playing single clap video.");
+                video.play().catch(e => {
+                    console.error("Single clap replay failed:", e);
+                    instructionText.textContent = genericPlayFailedText;
+                });
+            } else {
+                console.warn("handleSingleClapPlay: conditions not met for playing single clap.");
+            }
+        }
+    </script>
+</body>
+</html> 
